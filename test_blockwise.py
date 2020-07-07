@@ -1,97 +1,148 @@
 import itertools
 
 import numpy as np
+import dask.array as da
 import pytest
 
 import blockwise
 
-def test_shift():
-    def shift_slow(arr, num, axis, fill_value=np.nan):
-        out = np.empty_like(arr)
-        if num == 0:
-            out[:] = arr
-            return out
-        out = np.roll(arr, num, axis)
-        s = [slice(None), ]*out.ndim
-        if num > 0:
-            s[ax] = slice(0, num)
-        elif num < 0:
-            s[ax] = slice(num, None)
-        s = tuple(s)
-        out[s] = fill_value
-        return out
 
-    arr_shape = (3, 3)
-    arr = np.arange(np.prod(arr_shape)).reshape(arr_shape)
+@pytest.mark.parametrize(
+    "arr_shape,fill_value", [((3, 3), -1), ((3, 3), -2)],
+)
+def test_shift(arr_shape, fill_value):
+    # less critical params
+    seed = 42
+    low, high = 0, 2
+    # start test
+    da.random.seed(seed)
+    arr = da.random.randint(low=low, high=high, size=arr_shape)
     for ax in range(arr.ndim):
         d = arr_shape[ax]
-        for num in range(-(d-1), d):
-            ref = shift_slow(arr, num, ax, fill_value=-1)
-            test = blockwise.shift(arr, num, ax, fill_value=-1)
-            assert np.array_equal(ref, test)
+        filled_slice = [":", ] * arr.ndim
+        kept_slice = [":", ] * arr.ndim
+        for num in range(-(d - 1), d):
+            shifted = blockwise.shift(arr, num, ax, fill_value=fill_value)
+
+            filled_slice = [":", ] * arr.ndim
+            kept_slice = [":", ] * arr.ndim
+            new_slice = [":", ] * arr.ndim
+
+            if num == 0:
+                assert da.allclose(arr, shifted)
+            elif num > 0:
+                kept_slice[ax] = "0:{}".format(-num)
+                new_slice[ax] = "{}:".format(num)
+
+                ref = eval("arr[" + ", ".join(kept_slice) + "]")
+                test = eval("shifted[" + ", ".join(new_slice) + "]")
+
+                assert da.allclose(ref, test)
+
+                filled_slice[ax] = "0:{}".format(num)
+                filled_shape = arr_shape[:ax] + (num,) + arr_shape[ax+1:]
+
+                ref = da.full(shape=filled_shape, fill_value=fill_value)
+                test = eval("shifted[" + ", ".join(filled_slice) + "]")
+
+                assert da.allclose(ref, test)
+            else:
+                kept_slice[ax] = "{}:".format(-num)
+                new_slice[ax] = ":{}".format(num)
+
+                ref = eval("arr[" + ", ".join(kept_slice) + "]")
+                test = eval("shifted[" + ", ".join(new_slice) + "]")
+
+                assert da.allclose(ref, test)
+
+                filled_slice[ax] = "{}:".format(num)
+                filled_shape = arr_shape[:ax] + (-num,) + arr_shape[ax+1:]
+
+                ref = da.full(shape=filled_shape, fill_value=fill_value)
+                test = eval("shifted[" + ", ".join(filled_slice) + "]")
+
+                assert da.allclose(ref, test)
 
 
 def test_repeat_block():
-    arr = np.arange(4).reshape((2,2))
-    ref = np.array([[0,0,1,1], ]*3 + [[2,2,3,3], ]*3)
-    test = blockwise.repeat_block(arr, (3,2))
-    assert np.array_equal(ref, test)
+    arr = da.arange(4).reshape((2, 2))
+    ref = da.from_array(np.array([[0, 0, 1, 1], ] * 3 + [[2, 2, 3, 3], ] * 3))
+    test = blockwise.repeat_block(arr, (3, 2))
+    assert da.allclose(ref, test)
 
 
 def test_trim():
     arr_shape, block_shape = (6, 5), (3, 2)
-    arr = np.arange(np.prod(arr_shape)).reshape(arr_shape)
+    arr = da.arange(np.prod(arr_shape)).reshape(arr_shape)
     test = blockwise.trim(arr, block_shape)
     ref = arr[:, :4]
-    assert np.array_equal(ref, test)
+    assert da.allclose(ref, test)
 
 
-@pytest.mark.parametrize(
-    'funcname', [
-        'sum',
-        'mean',
-        'std',
-        ]
-)
+@pytest.mark.parametrize('funcname', ['sum', 'mean', 'std'])
 def test_bw_func(funcname):
+    # params perhaps less critical, can be parametrized in future
+    arr_shape, block_shape = (4, 6), (2, 3)
 
+    # straightforward implementation, takes np.ndarray
     def bruteforce_bw(arr, block_shape):
-        out_shape = [arr.shape[ax] // block_shape[ax] for ax in
-                range(arr.ndim)]
+        out_shape = [arr.shape[ax] // block_shape[ax]
+                     for ax in range(arr.ndim)]
         out = np.empty(out_shape)
         for coord in itertools.product(*[range(d) for d in out_shape]):
-            s = [slice(coord[ax]*block_shape[ax],
-                (coord[ax]+1)*block_shape[ax]) for ax in range(arr.ndim)]
+            s = [slice(coord[ax] * block_shape[ax],
+                 (coord[ax] + 1) * block_shape[ax])
+                 for ax in range(arr.ndim)]
             block = arr[tuple(s)]
-            out[coord] = eval('np.'+funcname)(block)
+            out[coord] = eval("np." + funcname)(block)
         return out
 
-    bw_func = getattr(blockwise, 'bw_'+funcname)
+    # get function name
+    bw_func = getattr(blockwise, "bw_" + funcname)
 
-    arr_shape, block_shape = (4, 6), (2, 3)
-    arr = np.arange(np.prod(arr_shape)).reshape(arr_shape)
-    ref = bruteforce_bw(arr, block_shape)
-    test = bw_func(arr, block_shape)
-    assert np.array_equal(ref, test)
+    # prepare identical data with different format
+    arr_npy = np.arange(np.prod(arr_shape)).reshape(arr_shape)
+    arr_da = da.from_array(arr_npy)
+
+    # reference result
+    ref_npy = bruteforce_bw(arr_npy, block_shape)
+    ref_da = da.from_array(ref_npy)
+
+    # test result
+    test_da = bw_func(arr_da, block_shape)
+
+    assert da.allclose(ref_da, test_da)
 
 
 def test_bw_corrcoef():
+    # params perhaps less critical, can be parametrized in future
+    arr_shape, block_shape = (4, 6), (2, 3)
 
+    # straightforward implementation, takes np.ndarray
     def bruteforce_bw(arr1, arr2, block_shape):
-        out_shape = [arr1.shape[ax] // block_shape[ax] for ax in
-                range(arr1.ndim)]
+        out_shape = [arr1.shape[ax] // block_shape[ax]
+                     for ax in range(arr1.ndim)]
         out = np.empty(out_shape)
         for coord in itertools.product(*[range(d) for d in out_shape]):
-            s = [slice(coord[ax]*block_shape[ax],
-                (coord[ax]+1)*block_shape[ax]) for ax in range(arr1.ndim)]
+            s = [slice(coord[ax] * block_shape[ax],
+                 (coord[ax] + 1) * block_shape[ax])
+                 for ax in range(arr1.ndim)]
             block1 = arr1[tuple(s)]
             block2 = arr2[tuple(s)]
-            out[coord] = np.corrcoef(block1.flatten(), block2.flatten())[0,1]
+            out[coord] = np.corrcoef(block1.flatten(), block2.flatten())[0, 1]
         return out
 
-    arr_shape, block_shape = (4, 6), (2, 3)
-    arr1 = np.arange(np.prod(arr_shape)).reshape(arr_shape)
-    arr2 = np.roll(arr1, 1, 0)
-    ref = bruteforce_bw(arr1, arr2, block_shape)
-    test = blockwise.bw_corrcoef(arr1, arr2, block_shape)
-    assert np.allclose(ref, test)
+    # prepare identical data with different format
+    arr1_npy = np.arange(np.prod(arr_shape)).reshape(arr_shape)
+    arr2_npy = np.roll(arr1_npy, 1, 0)
+    arr1_da = da.from_array(arr1_npy)
+    arr2_da = da.from_array(arr2_npy)
+
+    # reference result
+    ref_npy = bruteforce_bw(arr1_npy, arr2_npy, block_shape)
+    ref_da = da.from_array(ref_npy)
+
+    # test result
+    test_da = blockwise.bw_corrcoef(arr1_da, arr2_da, block_shape)
+
+    assert da.allclose(ref_da, test_da)

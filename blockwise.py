@@ -1,46 +1,37 @@
 import numpy as np
+import dask.array as da
 
 
-def shift(arr, num, axis, fill_value=np.nan):
+def shift(arr, num, axis, fill_value=0):
     """
     Shift N-dim array.
-
-    Modified from https://stackoverflow.com/a/42642326/6826902
     """
-    # make slices
-    def slice_maker(replace=None):
-        s = [slice(None), ] * arr.ndim
-        if replace is not None:
-            s[axis] = replace
-        return tuple(s)
+    if not num:
+        return arr.copy()
 
-    s0 = slice_maker()
-    s1 = slice_maker(slice(0, num))
-    s2 = slice_maker(slice(num, None))
-    s3p = slice_maker(slice(0, -num))
-    s3n = slice_maker(slice(-num, None))
+    fill_shape = arr.shape[:axis] + (abs(num), ) + arr.shape[axis+1:]
+    filled = da.full(shape=fill_shape, fill_value=fill_value)
 
-    # move arrays using slices
-    result = np.empty_like(arr)
+    kept_slice = [':', ] * arr.ndim
     if num > 0:
-        result[s1] = fill_value
-        result[s2] = arr[s3p]
-    elif num < 0:
-        result[s2] = fill_value
-        result[s1] = arr[s3n]
+        kept_slice[axis] = '0:{}'.format(-num)
+        kept = eval('arr[' + ', '.join(kept_slice) + ']')
+        result = da.concatenate([filled, kept], axis=axis)
     else:
-        result[s0] = arr
+        kept_slice[axis] = '{}:'.format(-num)
+        kept = eval('arr[' + ', '.join(kept_slice) + ']')
+        result = da.concatenate([kept, filled], axis=axis)
 
     return result
 
 
 def repeat_block(image, block_shape):
     """
-    numpy.repeat for n-dim.
+    da.repeat for n-dim.
     """
-    rep = image
+    rep = image.copy()
     for ax in range(image.ndim):
-        rep = np.repeat(rep, repeats=block_shape[ax], axis=ax)
+        rep = da.repeat(rep, repeats=block_shape[ax], axis=ax)
     return rep
 
 
@@ -52,11 +43,11 @@ def trim(image, block_shape):
     for ax in range(image.ndim):
         res = image.shape[ax] % block_shape[ax]
         if res:
-            s = slice(0, -res)
+            s = '0:{}'.format(-res)
         else:
-            s = slice(None)
+            s = ':'
         s_list.append(s)
-    return image[tuple(s_list)]
+    return eval('image[' + ', '.join(s_list) + ']')
 
 
 def bw_sum(image, block_shape, keep_shape=False):
@@ -67,17 +58,17 @@ def bw_sum(image, block_shape, keep_shape=False):
     https://github.com/dask/dask-image/pull/148#discussion_r444649473
     """
     # add up and subtract shifted copy, like np.diff but shifted
-    integral_image = image
+    integral_image = image.copy()
     for ax in range(image.ndim):
-        integral_image = np.cumsum(integral_image, axis=ax)
+        integral_image = da.cumsum(integral_image, axis=ax)
 
     window_sums = integral_image
     for ax in range(image.ndim):
         window_sums -= shift(window_sums, block_shape[ax], ax, fill_value=0)
 
     # now sum is at the corner of each block, slice to get it
-    s = [slice(d - 1, None, d) for d in block_shape]
-    window_sums = window_sums[tuple(s)]
+    s = ['{}::{}'.format(d-1, d) for d in block_shape]
+    window_sums = eval('window_sums[' + ', '.join(s) + ']')
 
     # repeat to get same shape back
     if keep_shape:
@@ -103,7 +94,7 @@ def bw_std(image, block_shape, ddof=0, keep_shape=False):
     image_zm = image - bwm
     # follow standard deviation formula
     bws = bw_sum(image_zm ** 2, block_shape, keep_shape=keep_shape)
-    return np.sqrt(bws / (np.prod(block_shape) - ddof))
+    return da.sqrt(bws / (np.prod(block_shape) - ddof))
 
 
 def bw_corrcoef(image1, image2, block_shape, keep_shape=False):
@@ -114,11 +105,11 @@ def bw_corrcoef(image1, image2, block_shape, keep_shape=False):
     image1_zm = image1 - bw_mean(image1, block_shape, keep_shape=True)
     image2_zm = image2 - bw_mean(image2, block_shape, keep_shape=True)
     # follow Pearson correlation coefficient formula
-    numerator = bw_mean(np.multiply(image1_zm, image2_zm), block_shape)
+    numerator = bw_mean(da.multiply(image1_zm, image2_zm), block_shape)
     image1_std = bw_std(image1, block_shape)
     image2_std = bw_std(image2, block_shape)
-    denominator = np.multiply(image1_std, image2_std)
-    bwcc = np.divide(numerator, denominator)
+    denominator = da.multiply(image1_std, image2_std)
+    bwcc = da.divide(numerator, denominator)
 
     if keep_shape:
         bwcc = repeat_block(bwcc, block_shape)

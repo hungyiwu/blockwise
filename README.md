@@ -26,3 +26,13 @@ straightforward, 4 processes: 85.913 sec
 # output from demo_performance.py
 blockwise, 1 process: 15.179 sec
 ```
+
+The example images shown above are 185 MB each (uint16). The next ones are 505 MB (uint16) each, which the `blockwise` approach wouldn't be possible on a 16 GB RAM machine without `dask.array` (also the free parallelization!):
+
+```
+# output from demo_performance.py
+arr1: (16120, 16840), arr2: (16120, 16840), block shape: (10, 10)
+straightforward, 1 process: 249.948 sec
+straightforward, 8 processes: 275.425 sec
+blockwise, 8 process: 41.308 sec
+```
