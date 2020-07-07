@@ -9,7 +9,7 @@ def shift(arr, num, axis, fill_value=np.nan):
     if not num:
         return arr.copy()
 
-    fill_shape = arr.shape[:axis] + (num, ) + arr.shape[axis+1:]
+    fill_shape = arr.shape[:axis] + (abs(num), ) + arr.shape[axis+1:]
     filled = da.full(shape=fill_shape, fill_value=fill_value)
 
     kept_slice = [':', ] * arr.ndim
