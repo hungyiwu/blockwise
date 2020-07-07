@@ -7,7 +7,9 @@ Image registration is crucial for comparing/integrating images with spatial corr
 
 One quick and intuitive way to check it is to calculate the correlation coefficient. However, calculating one coefficient for the entir image does not capture local heterogeneity if the image is large (ex. 10k-by-10k pixels). A better way is to calculate one coefficient for each smaller regions (ex. [for each single cell](https://github.com/hungyiwu/tissue_integrity_dashboard)).
 
-[add figure illustration]
+| Image 1 | Image 2 | Corr. coef. heatmap |
+|---------|---------|---------------------|
+|![](figures/arr1.png)|![](figures/arr2.png)|![](figures/corrcoef.png)|
 
 However, this imposes a software engineering challenge: tasks are so small (`np.corrcoef` for two 10x10 arrays) that communication overhead roughly cancels parallelization speedup.
 
