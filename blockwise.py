@@ -76,17 +76,17 @@ def bw_sum(image, block_shape, keep_shape=False):
     https://github.com/dask/dask-image/pull/148#discussion_r444649473
     """
     # add up and subtract shifted copy, like np.diff but shifted
-    integral_image = image
+    integral_image = image.copy()
     for ax in range(image.ndim):
-        integral_image = np.cumsum(integral_image, axis=ax)
+        integral_image = da.cumsum(integral_image, axis=ax)
 
     window_sums = integral_image
     for ax in range(image.ndim):
         window_sums -= shift(window_sums, block_shape[ax], ax, fill_value=0)
 
     # now sum is at the corner of each block, slice to get it
-    s = [slice(d - 1, None, d) for d in block_shape]
-    window_sums = window_sums[tuple(s)]
+    s = ['{}::{}'.format(d-1, d) for d in block_shape]
+    window_sums = eval('window_sums[' + ', '.join(s) + ']')
 
     # repeat to get same shape back
     if keep_shape:
