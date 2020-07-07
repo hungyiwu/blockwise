@@ -1,9 +1,11 @@
+import typing
 import itertools
 import multiprocessing as mp
 import time
 
 import numpy as np
-import tifffile
+import h5py
+import dask.array as da
 import fire
 
 import blockwise
@@ -88,24 +90,26 @@ def bw_single(arr1, arr2, block_shape):
     return blockwise.bw_corrcoef(arr1, arr2, block_shape)
 
 
-def run(image1_filepath, image2_filepath):
+def run(h5_filepath: str, key1: str, key2: str,
+        block_shape: typing.Tuple[int, int] = (10, 10)):
     # load data
-    arr1 = tifffile.imread(image1_filepath)
-    arr2 = tifffile.imread(image2_filepath)
-    block_shape = (10, 10)
+    f = h5py.File(h5_filepath, 'r')
+    arr1, arr2 = f[key1], f[key2]
     # preprocess data
-    arr1 = blockwise.trim(arr1, block_shape)
-    arr2 = blockwise.trim(arr2, block_shape)
+    arr1_h5 = blockwise.trim(arr1, block_shape)
+    arr2_h5 = blockwise.trim(arr2, block_shape)
+    # make dask.array equivalent
+    arr1_da, arr2_da = da.from_array(arr1_h5), da.from_array(arr2_h5)
     # describe data
-    print('arr1: {}, arr2: {}, block shape: {}'.format(arr1.shape, arr2.shape,
-          block_shape))
+    print('arr1: {}, arr2: {}, block shape: {}'.format(arr1_h5.shape,
+          arr2_h5.shape, block_shape))
     # run
     with Timer('straightforward, 1 process'):
-        sf_single(arr1, arr2, block_shape)
-    with Timer('straightforward, 4 processes'):
-        sf_parallel(arr1, arr2, block_shape, nproc=4)
-    with Timer('blockwise, 1 process'):
-        bw_single(arr1, arr2, block_shape)
+        sf_single(arr1_h5, arr2_h5, block_shape)
+    with Timer('straightforward, 8 processes'):
+        sf_parallel(arr1_h5, arr2_h5, block_shape, nproc=4)
+    with Timer('blockwise, 8 process'):
+        bw_single(arr1_da, arr2_da, block_shape)
 
 
 if __name__ == "__main__":
