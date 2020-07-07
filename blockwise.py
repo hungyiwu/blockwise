@@ -2,24 +2,6 @@ import numpy as np
 import dask.array as da
 
 
-def slice_str(arr, slices):
-    '''
-    For N-dim slicing of dask.array
-    '''
-    str_list = []
-    for s in slices:
-        if s == slice(None):
-            s_str = ':'
-        elif s.stop is None and s.step is None:
-            s_str = '{}:'.format(s.start)
-        elif s.stop is None:
-            s_str = '{}::{}'.format(s.start, s.step)
-        else:
-            s_str = '{}:{}'.format(s.start, s.stop)
-        str_list.append(s_str)
-    return ', '.join(str_list)
-
-
 def shift(arr, num, axis, fill_value=np.nan):
     """
     Shift N-dim array.
@@ -112,7 +94,7 @@ def bw_std(image, block_shape, ddof=0, keep_shape=False):
     image_zm = image - bwm
     # follow standard deviation formula
     bws = bw_sum(image_zm ** 2, block_shape, keep_shape=keep_shape)
-    return np.sqrt(bws / (np.prod(block_shape) - ddof))
+    return da.sqrt(bws / (np.prod(block_shape) - ddof))
 
 
 def bw_corrcoef(image1, image2, block_shape, keep_shape=False):
@@ -123,11 +105,11 @@ def bw_corrcoef(image1, image2, block_shape, keep_shape=False):
     image1_zm = image1 - bw_mean(image1, block_shape, keep_shape=True)
     image2_zm = image2 - bw_mean(image2, block_shape, keep_shape=True)
     # follow Pearson correlation coefficient formula
-    numerator = bw_mean(np.multiply(image1_zm, image2_zm), block_shape)
+    numerator = bw_mean(da.multiply(image1_zm, image2_zm), block_shape)
     image1_std = bw_std(image1, block_shape)
     image2_std = bw_std(image2, block_shape)
-    denominator = np.multiply(image1_std, image2_std)
-    bwcc = np.divide(numerator, denominator)
+    denominator = da.multiply(image1_std, image2_std)
+    bwcc = da.divide(numerator, denominator)
 
     if keep_shape:
         bwcc = repeat_block(bwcc, block_shape)
