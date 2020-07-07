@@ -17,8 +17,10 @@ class Timer(object):
     '''
     def __init__(self, description):
         self.description = description
+
     def __enter__(self):
         self.start = time.time()
+
     def __exit__(self, type, value, traceback):
         self.end = time.time()
         print('{}: {:.3f} sec'.format(
@@ -96,7 +98,7 @@ def run(image1_filepath, image2_filepath):
     arr2 = blockwise.trim(arr2, block_shape)
     # describe data
     print('arr1: {}, arr2: {}, block shape: {}'.format(arr1.shape, arr2.shape,
-        block_shape))
+          block_shape))
     # run
     with Timer('straightforward, 1 process'):
         sf_single(arr1, arr2, block_shape)
