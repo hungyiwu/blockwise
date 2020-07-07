@@ -2,7 +2,7 @@ import numpy as np
 import dask.array as da
 
 
-def shift(arr, num, axis, fill_value=np.nan):
+def shift(arr, num, axis, fill_value=0):
     """
     Shift N-dim array.
     """
