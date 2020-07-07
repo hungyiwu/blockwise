@@ -83,11 +83,12 @@ def sf_parallel(arr1, arr2, block_shape, nproc=4):
     return out
 
 
-def bw_single(arr1, arr2, block_shape):
+def bw_dask(arr1, arr2, block_shape):
     """
     Blockwise approach, single process.
     """
-    return blockwise.bw_corrcoef(arr1, arr2, block_shape)
+    res = blockwise.bw_corrcoef(arr1, arr2, block_shape)
+    return res.compute()
 
 
 def run(h5_filepath: str, key1: str, key2: str,
@@ -109,7 +110,7 @@ def run(h5_filepath: str, key1: str, key2: str,
     with Timer('straightforward, 8 processes'):
         sf_parallel(arr1_h5, arr2_h5, block_shape, nproc=4)
     with Timer('blockwise, 8 process'):
-        bw_single(arr1_da, arr2_da, block_shape)
+        bw_dask(arr1_da, arr2_da, block_shape)
 
 
 if __name__ == "__main__":
