@@ -1,35 +1,44 @@
 import numpy as np
+import dask.array as da
+
+
+def slice_str(arr, slices):
+    '''
+    For N-dim slicing of dask.array
+    '''
+    str_list = []
+    for s in slices:
+        if s == slice(None):
+            s_str = ':'
+        elif s.stop is None and s.step is None:
+            s_str = '{}:'.format(s.start)
+        elif s.stop is None:
+            s_str = '{}::{}'.format(s.start, s.step)
+        else:
+            s_str = '{}:{}'.format(s.start, s.stop)
+        str_list.append(s_str)
+    return ', '.join(str_list)
 
 
 def shift(arr, num, axis, fill_value=np.nan):
     """
     Shift N-dim array.
-
-    Modified from https://stackoverflow.com/a/42642326/6826902
     """
-    # make slices
-    def slice_maker(replace=None):
-        s = [slice(None), ] * arr.ndim
-        if replace is not None:
-            s[axis] = replace
-        return tuple(s)
+    if num == 0:
+        return arr
 
-    s0 = slice_maker()
-    s1 = slice_maker(slice(0, num))
-    s2 = slice_maker(slice(num, None))
-    s3p = slice_maker(slice(0, -num))
-    s3n = slice_maker(slice(-num, None))
+    fill_shape = arr.shape[:axis] + (num, ) + arr.shape[axis+1:]
+    filled = da.full(shape=fill_shape, fill_value=fill_value)
 
-    # move arrays using slices
-    result = np.empty_like(arr)
+    kept_slice = [':', ] * arr.ndim
     if num > 0:
-        result[s1] = fill_value
-        result[s2] = arr[s3p]
-    elif num < 0:
-        result[s2] = fill_value
-        result[s1] = arr[s3n]
+        kept_slice[axis] = '0:-{}'.format(num)
+        kept = eval('arr[' + ', '.join(kept_slice) + ']')
+        result = da.concatenate([filled, kept], axis=axis)
     else:
-        result[s0] = arr
+        kept_slice[axis] = '{}:'.format(-num)
+        kept = eval('arr[' + ', '.join(kept_slice) + ']')
+        result = da.concatenate([kept, filled], axis=axis)
 
     return result
 
