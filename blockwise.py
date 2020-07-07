@@ -24,15 +24,15 @@ def shift(arr, num, axis, fill_value=np.nan):
     """
     Shift N-dim array.
     """
-    if num == 0:
-        return arr
+    if not num:
+        return arr.copy()
 
     fill_shape = arr.shape[:axis] + (num, ) + arr.shape[axis+1:]
     filled = da.full(shape=fill_shape, fill_value=fill_value)
 
     kept_slice = [':', ] * arr.ndim
     if num > 0:
-        kept_slice[axis] = '0:-{}'.format(num)
+        kept_slice[axis] = '0:{}'.format(-num)
         kept = eval('arr[' + ', '.join(kept_slice) + ']')
         result = da.concatenate([filled, kept], axis=axis)
     else:
@@ -45,11 +45,11 @@ def shift(arr, num, axis, fill_value=np.nan):
 
 def repeat_block(image, block_shape):
     """
-    numpy.repeat for n-dim.
+    da.repeat for n-dim.
     """
-    rep = image
+    rep = image.copy()
     for ax in range(image.ndim):
-        rep = np.repeat(rep, repeats=block_shape[ax], axis=ax)
+        rep = da.repeat(rep, repeats=block_shape[ax], axis=ax)
     return rep
 
 
@@ -61,11 +61,11 @@ def trim(image, block_shape):
     for ax in range(image.ndim):
         res = image.shape[ax] % block_shape[ax]
         if res:
-            s = slice(0, -res)
+            s = '0:{}'.format(-res)
         else:
-            s = slice(None)
+            s = ':'
         s_list.append(s)
-    return image[tuple(s_list)]
+    return eval('image[' + ', '.join(s_list) + ']')
 
 
 def bw_sum(image, block_shape, keep_shape=False):
