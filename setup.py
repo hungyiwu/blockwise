@@ -6,6 +6,6 @@ setup(name='blockwise',
       url='https://github.com/hungyiwu/blockwise',
       author='Hung-Yi Wu',
       author_email='hungyiwu@protonmail.com',
-      license='MIT', # TODO: which one to use?
+      license='MIT',
       packages=['blockwise'],
       zip_safe=False)
