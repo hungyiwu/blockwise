@@ -6,7 +6,7 @@ with open('README.md', 'r') as fh:
 
 setuptools.setup(
     name='blockwise',
-    version='0.1',
+    version='0.2',
     author='Hung-Yi Wu',
     author_email='hungyiwu@protonmail.com',
     description='Fast blockwise operations of array data',
