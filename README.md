@@ -1,5 +1,14 @@
 # Blockwise
+
+[NOTE] better practice found, see `better_practice` folder.
+
+## Plan to sunset this repo
+- [ ] Best case is if the ilastik team has a plan to make that function reusable programmatically (see [issue](https://github.com/ilastik/ilastik/issues/2275) posted). I'm more than happy to help if they see fit.
+- [ ] De-register this package from [PyPI](https://pypi.org) so others can re-use the name `blockwise`
+- [ ] Archive this repo
+
 Fast blockwise operations of array data
+
 ## Rationale
 Image registration is crucial for comparing/integrating images with spatial correspondence but don't exactly align due to complications like specimen deformation (ex. histological images) or optical distortion. There has been a thriving effort to develop powerful non-rigid image registrations (ex. [ANHIR](https://ieeexplore.ieee.org/document/9058666)), yet from an end user's perspective, the very first question is not "which algorithm to use" but rather:
 
