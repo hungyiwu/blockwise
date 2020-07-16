@@ -4,7 +4,7 @@
 
 ## Plan to sunset this repo
 - [ ] Best case is if the ilastik team has a plan to make that function reusable programmatically (see [issue](https://github.com/ilastik/ilastik/issues/2275) posted). I'm more than happy to help if they see fit.
-- [ ] De-register this package from [PyPI](https://pypi.org) so others can re-use the name `blockwise`
+- [x] De-register this package from [PyPI](https://pypi.org) so others can re-use the name `blockwise`
 - [ ] Archive this repo
 
 Fast blockwise operations of array data
